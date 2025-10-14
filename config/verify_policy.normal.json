@@ -1,0 +1,17 @@
+{
+  "policy": {
+    "hard": ["SSIM", "PSNR", "SKEW"],
+    "warn": ["NOISE", "OCR", "BARCODE"]
+  },
+  "ssimThreshold": 0.7,
+  "psnrMinDb": 18.0,
+  "noiseMax": 0.8,
+  "skewMaxDeg": 1.0,
+  "ocr": {
+    "required": false,
+    "minAccuracy": 0.95
+  },
+  "barcode": {
+    "requiredOnControlOnly": false
+  }
+}

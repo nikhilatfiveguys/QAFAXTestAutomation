@@ -1,0 +1,34 @@
+{
+  "name": "Brother_V34_33k6_ECM256",
+  "standard": "V34",
+  "paperSize": "Letter",
+  "dpi": 200,
+  "maxBitrateBps": 33600,
+  "minBitrateBps": 2400,
+  "bitrateStepsBps": [33600, 31200, 28800, 26400, 24000, 21600, 19200, 16800, 14400, 12000, 9600, 7200, 4800, 2400],
+  "ecm": {
+    "enabled": true,
+    "blockBytes": 256,
+    "maxRetries": 3,
+    "timeoutMs": 2500
+  },
+  "v34": {
+    "longTraining": false,
+    "tcfDurationMs": 1500,
+    "asymmetricAllowed": true
+  },
+  "v17": null,
+  "t30TimersMs": {
+    "T1": 35000,
+    "T2": 6000,
+    "T3": 10000
+  },
+  "phaseBNoiseChance": 0.02,
+  "fallbackPolicy": "graceful",
+  "brandQuirks": {
+    "nsfVendorBytes": "62-52-4F",
+    "retryPageWhenCFRLate": true,
+    "preferECMOn": true
+  },
+  "transport": "sim"
+}
