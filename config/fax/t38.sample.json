@@ -1,0 +1,25 @@
+{
+  "sip": {
+    "user": "1001",
+    "password": "REDACTED",
+    "domain": "sip.example.com",
+    "proxy": "sip:sip.example.com;transport=udp"
+  },
+  "t38": {
+    "enable": true,
+    "prefer": true,
+    "fallbackG711": false,
+    "ecm": true,
+    "maxBitrate": 33600
+  },
+  "tools": {
+    "ua": "pjsua",
+    "uaPath": "pjsua",
+    "t38Path": "t38modem",
+    "extraArgs": []
+  },
+  "timeouts": {
+    "setupSec": 30,
+    "pageSec": 120
+  }
+}
