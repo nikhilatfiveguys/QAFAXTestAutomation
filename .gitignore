@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+artifacts/
+build/
+dist/
+
+# PyInstaller cache
+*.spec
+!scripts/qafax_desktop.spec
+
+# Virtual environments
+.venv/
+.env/
