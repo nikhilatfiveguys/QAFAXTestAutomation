@@ -24,6 +24,12 @@ def _parse_args(argv: List[str] | None) -> RunOptions:
         default="digital",
         help="Test path used for the run",
     )
+    parser.add_argument(
+        "--transport",
+        choices=["sim", "t38", "modem"],
+        default="sim",
+        help="Transport path to use before verification",
+    )
     parser.add_argument("--did", default=None, help="Dialed DID used for the run")
     parser.add_argument("--pcfax-queue", dest="pcfax_queue", default=None, help="HP PC-Fax queue identifier")
     parser.add_argument("--ingest-dir", dest="ingest_dir", default=None, help="Directory to monitor for ingested scans")
@@ -62,6 +68,18 @@ def _parse_args(argv: List[str] | None) -> RunOptions:
         default=None,
         help="Path to FoIP/T.38 validation configuration JSON",
     )
+    parser.add_argument(
+        "--t38-config",
+        type=Path,
+        default=None,
+        help="Path to built-in T.38 transport configuration JSON",
+    )
+    parser.add_argument(
+        "--modem-config",
+        type=Path,
+        default=None,
+        help="Path to USB modem transport configuration JSON",
+    )
     args = parser.parse_args(argv)
 
     snmp_oids: Sequence[str] = [oid.strip() for oid in args.snmp_oids.split(",") if oid.strip()]
@@ -76,6 +94,7 @@ def _parse_args(argv: List[str] | None) -> RunOptions:
         output_dir=args.output,
         run_id=args.run_id,
         path_mode=args.path,
+        transport=args.transport,
         did=args.did,
         pcfax_queue=args.pcfax_queue,
         ingest_dir=args.ingest_dir,
@@ -88,6 +107,8 @@ def _parse_args(argv: List[str] | None) -> RunOptions:
         snmp_community=args.snmp_community,
         snmp_oids=snmp_oids,
         foip_config=args.foip_config,
+        t38_config=args.t38_config,
+        modem_config=args.modem_config,
     )
 
 

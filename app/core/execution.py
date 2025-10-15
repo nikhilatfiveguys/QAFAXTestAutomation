@@ -1,4 +1,4 @@
-"""Shared execution utilities for CLI and web workflows."""
+"""Shared execution utilities for CLI and desktop workflows."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -9,6 +9,7 @@ import json
 
 from ..connectors.smb_ingest import SMBIngestor
 from ..connectors.snmp import SNMPSnapshot, query_status
+from ..core.fax_job import FaxJob, FaxJobResult, TransportOptions
 from ..core.fax_simulation import FaxProfile
 from ..core.foip import FoipResult, FoipValidator
 from ..core.iteration_controller import (
@@ -21,6 +22,8 @@ from ..core.send_pcfax import submit_to_queue
 from ..reports.reporter import ReportBuilder
 from ..verify.pipeline import VerificationPipeline
 from .config_service import ConfigService, default_config_service
+from .fax_encode import FaxEncodingError, FaxPage
+from ..transport.base import FaxTransportResult
 
 
 DEFAULT_SNMP_OIDS: Tuple[str, ...] = (
@@ -54,6 +57,9 @@ class RunOptions:
     snmp_community: str = "public"
     snmp_oids: Sequence[str] = field(default_factory=lambda: DEFAULT_SNMP_OIDS)
     foip_config: Optional[Path] = None
+    transport: str = "sim"
+    t38_config: Optional[Path] = None
+    modem_config: Optional[Path] = None
 
 
 @dataclass
@@ -66,6 +72,8 @@ class RunResult:
     ingest_artifacts: List[Dict[str, object]]
     snmp_snapshot: Optional[SNMPSnapshot]
     foip_result: Optional[FoipResult]
+    fax_transport: Optional[FaxTransportResult]
+    fax_pages: List[FaxPage]
     run_dir: Path
     generated_files: Dict[str, Path]
 
@@ -83,6 +91,42 @@ def execute_run(options: RunOptions, config_service: ConfigService | None = None
         require_barcode=options.require_barcode,
     )
     controller = IterationController(profile=profile, verification_pipeline=pipeline)
+    report_builder = ReportBuilder(options.output_dir)
+    run_dir = report_builder.ensure_run_directory(options.run_id)
+
+    fax_transport: Optional[FaxTransportResult] = None
+    fax_pages: List[FaxPage] = []
+    if options.transport.lower() in {"t38", "modem"}:
+        job = FaxJob(options.candidate, run_dir)
+        transport_options = TransportOptions(
+            mode=options.transport.lower(),
+            did=options.did,
+            t38_config=options.t38_config,
+            modem_config=options.modem_config,
+        )
+        try:
+            job_result = job.execute(transport_options)
+        except FaxEncodingError as exc:
+            fax_transport = FaxTransportResult(
+                executed=False,
+                transport=options.transport.lower(),
+                detail="Fax encoding failed",
+                timeline=[],
+                artifacts=[],
+                errors=[str(exc)],
+            )
+        else:
+            fax_pages = job_result.pages
+            fax_transport = job_result.transport_result
+            if fax_transport:
+                controller.telemetry_sink.emit(
+                    "transport.executed",
+                    mode=fax_transport.transport,
+                    executed=fax_transport.executed,
+                    detail=fax_transport.detail,
+                    events=len(fax_transport.timeline),
+                    artifacts=len(fax_transport.artifacts),
+                )
 
     pcfax_detail: Optional[str] = None
     if options.pcfax_queue:
@@ -175,9 +219,11 @@ def execute_run(options: RunOptions, config_service: ConfigService | None = None
         ingest_pattern=options.ingest_pattern if options.ingest_dir else None,
         snmp_snapshot=snmp_snapshot,
         foip_result=foip_result,
+        transport_mode=options.transport.lower(),
+        fax_transport=fax_transport,
+        fax_pages=fax_pages,
     )
 
-    report_builder = ReportBuilder(options.output_dir)
     telemetry_events = list(controller.iter_events())
     run_dir, generated = _persist_reports(
         report_builder,
@@ -188,6 +234,7 @@ def execute_run(options: RunOptions, config_service: ConfigService | None = None
         ingest_artifacts,
         snmp_snapshot,
         foip_result,
+        fax_transport,
     )
 
     return RunResult(
@@ -197,6 +244,8 @@ def execute_run(options: RunOptions, config_service: ConfigService | None = None
         ingest_artifacts=ingest_artifacts,
         snmp_snapshot=snmp_snapshot,
         foip_result=foip_result,
+        fax_transport=fax_transport,
+        fax_pages=fax_pages,
         run_dir=run_dir,
         generated_files=generated,
     )
@@ -247,6 +296,9 @@ def _build_context(
     ingest_pattern: Optional[str],
     snmp_snapshot: SNMPSnapshot | None,
     foip_result: FoipResult | None,
+    transport_mode: str,
+    fax_transport: FaxTransportResult | None,
+    fax_pages: List[FaxPage],
 ) -> RunContext:
     return RunContext(
         run_id=run_id,
@@ -267,6 +319,9 @@ def _build_context(
         pcfax_detail=pcfax_detail,
         snmp_snapshot=snmp_snapshot,
         foip_result=foip_result,
+        transport_mode=transport_mode,
+        fax_transport=fax_transport,
+        fax_pages=fax_pages,
     )
 
 
@@ -279,6 +334,7 @@ def _persist_reports(
     ingest_artifacts: Sequence[Dict[str, object]],
     snmp_snapshot: SNMPSnapshot | None,
     foip_result: FoipResult | None,
+    fax_transport: FaxTransportResult | None,
 ) -> tuple[Path, Dict[str, Path]]:
     run_dir = report_builder.ensure_run_directory(run_id)
     generated: Dict[str, Path] = {}
@@ -290,10 +346,14 @@ def _persist_reports(
         ingest_artifacts,
         snmp_snapshot=snmp_snapshot,
         foip_result=foip_result,
+        fax_transport=fax_transport,
     )
     generated["summary_csv"] = report_builder.write_csv(run_dir, context, iterations)
     generated["report_html"] = report_builder.write_html(run_dir, context, iterations)
     generated["run_log"] = report_builder.write_run_log(run_dir, context, iterations)
+    timeline_path = report_builder.write_transport_timeline(run_dir, context)
+    if timeline_path:
+        generated["transport_timeline_csv"] = timeline_path
     reference_doc, candidate_doc = _first_verified_documents(iterations)
     if reference_doc and candidate_doc:
         generated["provenance_json"] = report_builder.write_provenance(
@@ -303,6 +363,7 @@ def _persist_reports(
             ingest_artifacts,
             snmp_snapshot=snmp_snapshot,
             foip_result=foip_result,
+            fax_transport=fax_transport,
         )
     telemetry_path = run_dir / "telemetry.json"
     telemetry_path.write_text(json.dumps(telemetry, indent=2))

@@ -16,8 +16,10 @@ artifacts suitable for QA review packages.
   under `artifacts/<run-id>/`
 - Configurable device profiles and verification policies loaded from `config/`
 - Metadata capture for DID, HP PC-Fax queue submissions, ingest directory monitoring,
-  optional SNMP snapshots, and FoIP/T.38 validation attempts
+  optional SNMP snapshots, FoIP/T.38 validation attempts, and built-in T.38/USB modem
+  transport timelines
 - Optional self-test tool that checks for optional dependencies and environment readiness
+- Optional PySide6 desktop UI for running the entire workflow without a browser
 
 ## First-Time Setup (Summary)
 
@@ -53,8 +55,10 @@ below help you run the CLI quickly:
 
    - `--profile` / `--policy` to load different configuration files
    - `--path {digital|print-scan}` to record the path chips in reports (default: `digital`)
+   - `--transport {sim|t38|modem}` to run the built-in transport encoder + timeline capture
    - `--did` to log the dialed DID
    - `--pcfax-queue` to attempt an HP PC-Fax submission (Windows + PyWin32 required)
+   - `--t38-config` / `--modem-config` to point at driverless fax configuration JSON files
    - `--ingest-dir` / `--ingest-pattern` / `--ingest-timeout` / `--ingest-interval` to poll a
      scan folder for new artifacts after each run
    - `--snmp-target` / `--snmp-community` / `--snmp-oids` to collect printer counters via SNMP
@@ -68,42 +72,48 @@ below help you run the CLI quickly:
    - `summary.csv` — iteration summaries suitable for spreadsheets
    - `report.html` — human-friendly view with chips and negotiation logs
    - `run.log` — text log of Phase B→D events for every iteration
+   - `transport_timeline.csv` — optional timeline of built-in T.38/modem transport events
    - `provenance.json` — hashes, sizes, and ingest provenance for reproducibility
    - `telemetry.json` — structured telemetry emitted during execution
 
-## Web Interface
+## Desktop GUI
 
-The entire workflow is also available through a browser-based UI powered by FastAPI.
+Operators who prefer a Windows desktop experience can install `PySide6` and launch
+the PyQt-based interface:
 
-1. Install the optional dependencies:
+```bash
+pip install PySide6
+python -m app.ui  # opens the QAFAX Desktop window
+```
 
-   ```bash
-   pip install fastapi uvicorn python-multipart
-   ```
+The desktop UI exposes the same options as the CLI: choose reference/candidate
+documents, pick profiles and policies, configure transport (simulation, built-in
+T.38, USB modem), toggle HP PC-Fax submission, ingest polling, SNMP snapshots,
+and FoIP validation. Execution happens in a background thread so progress logs and
+artifacts appear in the window without blocking the interface.
 
-2. Launch the server:
+## Windows Executable Build
 
-   ```bash
-   python -m app.web  # listens on http://127.0.0.1:8000
-   ```
+To distribute the desktop UI without requiring Python, bundle it into a standalone
+`.exe` using PyInstaller (install `pyinstaller` first):
 
-3. Open `http://127.0.0.1:8000` in a browser, upload reference and candidate
-   documents, adjust options (iterations, profile, HP PC-Fax queue, SMB ingest,
-   SNMP, FoIP), and start the run. The UI renders the per-iteration metrics and
-   provides direct download links to the HTML/CSV/JSON/log artifacts, FoIP
-   outputs, and telemetry.
+```powershell
+pip install pyinstaller
+powershell -ExecutionPolicy Bypass -File scripts/build_windows_exe.ps1
+```
 
-The web form simply orchestrates the same execution pipeline used by the CLI, so
-every feature—including SNMP snapshots, FoIP validation, HP PC-Fax submissions,
-and ingest polling—can be initiated from the browser.
+The script produces `dist/QAFAXDesktop/QAFAXDesktop.exe` with the GUI entry point and
+bundled configuration/templates (`config/`, `docs/`). Sign the resulting binary according
+to your deployment policies before sharing it with QA operators.
 
 ## Configuration
 
 Device profiles live under `config/profiles/`, verification policies under
-`config/verify_policy.*.json`, and FoIP samples in `config/foip.sample.json`. Each run
-records the SHA-256 hash of the loaded profile and policy so operators can reproduce
-results. Policies now include preprocessing preferences and optional metric gates that can
-be tightened per site.
+`config/verify_policy.*.json`, FoIP samples in `config/foip.sample.json`, and
+driverless fax transport templates in `config/fax/`. Each run records the
+SHA-256 hash of the loaded profile and policy so operators can reproduce
+results. Policies now include preprocessing preferences and optional metric
+gates that can be tightened per site.
 
 ## Self-Test
 
@@ -113,7 +123,9 @@ Validate optional tooling and environment prerequisites with:
 python -m app.tools.self_test
 ```
 
-The tool writes `artifacts/self_test.json` with pass/fail results.
+The tool writes `artifacts/self_test.json` with pass/fail results, including
+checks for optional Python packages, HP PC-Fax queues, and FoIP/transport tools
+(`t38modem`, `pjsua`).
 
 ## Testing
 

@@ -4,11 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from .fax_simulation import FaxProfile
 from ..connectors.snmp import SNMPSnapshot
 from .foip import FoipResult
+from .fax_encode import FaxPage
+from ..transport.base import FaxTransportResult
 
 
 @dataclass
@@ -31,6 +33,9 @@ class RunContext:
     pcfax_detail: Optional[str] = None
     snmp_snapshot: Optional[SNMPSnapshot] = None
     foip_result: Optional[FoipResult] = None
+    transport_mode: str = "sim"
+    fax_transport: Optional[FaxTransportResult] = None
+    fax_pages: Sequence[FaxPage] = ()
 
     @property
     def path_label(self) -> str:
@@ -65,3 +70,11 @@ class RunContext:
                 return f"SNMP WARN {self.snmp_snapshot.target}"
             return f"SNMP {self.snmp_snapshot.target}"
         return None
+
+    @property
+    def transport_label(self) -> str:
+        transport = self.transport_mode.upper()
+        if self.fax_transport:
+            status = "OK" if self.fax_transport.executed else "DRY"
+            return f"Transport {transport} {status}"
+        return f"Transport {transport}"

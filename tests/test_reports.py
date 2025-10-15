@@ -12,6 +12,7 @@ from app.core.fax_simulation import FaxProfile
 from app.core.iteration_controller import IterationConfig, IterationController
 from app.core.run_context import RunContext
 from app.reports.reporter import ReportBuilder
+from app.transport.base import FaxTransportResult, TransportEvent
 from app.verify.pipeline import VerificationPipeline
 
 
@@ -72,6 +73,57 @@ class ReportBuilderTestCase(unittest.TestCase):
             summary = json.loads((run_dir / "summary.json").read_text())
             self.assertEqual(summary["run"]["id"], "test")
             self.assertEqual(len(summary["iterations"]), 1)
+
+    def test_transport_timeline_written(self) -> None:
+        controller = IterationController(profile=self.profile, verification_pipeline=self.pipeline)
+        results = controller.run(
+            IterationConfig(iterations=1, rng_seed=42),
+            reference=self.reference,
+            candidate=self.candidate,
+        )
+        transport = FaxTransportResult(
+            executed=False,
+            transport="t38",
+            detail="dry run",
+            timeline=[TransportEvent(0.0, "PHASE_B", "DIS", "mock")],
+            artifacts=[],
+            errors=["missing"],
+            command=["t38modem"],
+        )
+        context = RunContext(
+            run_id="transport-test",
+            profile=self.profile,
+            policy_name="normal",
+            policy_hash=self.policy.sha256,
+            iterations=1,
+            seed=42,
+            reference=self.reference,
+            candidate=self.candidate,
+            path_mode="digital",
+            location="Local",
+            did="18005551212",
+            pcfax_queue=None,
+            started_at=datetime.utcnow(),
+            ingest_dir=None,
+            ingest_pattern=None,
+            pcfax_detail=None,
+            transport_mode="t38",
+            fax_transport=transport,
+            fax_pages=[],
+        )
+        telemetry = list(controller.iter_events())
+
+        with TemporaryDirectory() as tmpdir:
+            builder = ReportBuilder(Path(tmpdir))
+            run_dir = builder.ensure_run_directory(context.run_id)
+            builder.write_json(run_dir, context, results, telemetry, [], fax_transport=transport)
+            builder.write_html(run_dir, context, results)
+            timeline_path = builder.write_transport_timeline(run_dir, context)
+            self.assertIsNotNone(timeline_path)
+            assert timeline_path is not None
+            self.assertTrue(timeline_path.is_file())
+            html_content = (run_dir / "report.html").read_text()
+            self.assertIn("Transport T38", html_content)
 
 
 if __name__ == "__main__":

@@ -16,9 +16,10 @@ This guide explains how to prepare your workstation, run the CLI, and exercise e
 | Tesseract OCR | Optional | Required if you enable OCR gates (`--require-ocr`). Install language packs needed for your documents. |
 | ZBar / `pyzbar` | Optional | Required if you enable barcode gates (`--require-barcode`). |
 | PyWin32 | Optional (Windows) | Needed for silent HP PC-Fax submissions. Install with `pip install pywin32`. |
+| PySerial | Optional | Required for USB modem transport support. Install with `pip install pyserial`. |
 | FastAPI + Uvicorn | Optional | Required for the browser UI. Install with `pip install fastapi uvicorn python-multipart`. |
 | SMB share access | Optional | Configure a network share for device scans if you plan to ingest print/scan artifacts. |
-| SIP/T.38 tooling | Optional | Needed for FoIP validation. Provide CLI tools/scripts referenced in `config/foip.sample.json`. |
+| SIP/T.38 tooling | Optional | Needed for FoIP validation and the built-in T.38 transport. Provide CLI tools such as `t38modem` and `pjsua` referenced in `config/fax/t38.sample.json`. |
 
 > The CLI runs without optional dependencies. Missing tooling downgrades optional metrics to WARN unless explicitly required.
 
@@ -62,9 +63,11 @@ Review `artifacts/self_test.json` for pass/fail results and remediation hints.
   1. Confirm the device exposes read-only SNMP on the expected community or v3 credentials.
   2. Collect the OIDs you want to poll (e.g., counters for jams, page counts).
 
-* **FoIP/T.38 Tooling:**
+* **FoIP/T.38 Tooling & Driverless Fax Transports:**
   1. Provision SIP credentials and CLI scripts capable of originating/terminating fax calls.
-  2. Copy `config/foip.sample.json` to a custom file and update the command templates.
+  2. Install command-line tools such as `t38modem` and `pjsua` for the built-in T.38 transport.
+  3. Copy `config/foip.sample.json` (FoIP validation) and `config/fax/t38.sample.json` (driverless transport) to local files and update credentials, tool paths, and timeouts.
+  4. For USB modem workflows, connect a Class 1/2 modem and install `pyserial`. Copy `config/fax/modem.sample.json` and set the COM port and initialization strings required by your hardware.
 
 ---
 
@@ -90,10 +93,13 @@ This command:
 * Use `--policy verify_policy.strict` to load `config/verify_policy.strict.json` (if present).
 * The SHA-256 hash of each config is stored in the artifacts for reproducibility.
 
-### 2.3 Path Metadata
+### 2.3 Path & Transport Metadata
 
 * `--path digital` (default) records that the candidate was a direct digital ingest.
 * `--path print-scan` marks runs expecting physical print + scan workflows.
+* `--transport sim` (default) records that only the simulator ran before verification.
+* `--transport t38 --t38-config config/fax/t38.local.json` encodes the candidate into fax-ready TIFF pages and executes the driverless T.38 flow (dry-run if tooling is missing).
+* `--transport modem --modem-config config/fax/modem.local.json` uses the USB modem path.
 * `--location RemoteSite` can be set in `RunContext` when remote mode is added (TODO).
 
 ---
@@ -167,13 +173,24 @@ unique textual content per page or add control-sheet fiducials before rescanning
 4. Results appear in logs, JSON, HTML, and provenance files.
 5. Failures (non-zero exit codes, missing files) are captured in the error list.
 
-### 3.7 Deterministic Simulation & Iterations
+### 3.7 Driverless Fax Transport (T.38 / USB Modem)
+
+1. Choose the transport path using `--transport t38` or `--transport modem`.
+2. Provide the corresponding configuration file with `--t38-config` or `--modem-config`.
+3. The CLI converts the candidate document into fax TIFF pages (requires Pillow/pdf2image).
+4. For T.38, the tool checks for the presence of `t38modem`/`pjsua` and records a dry-run timeline if unavailable. When present, the simulated command line is logged for auditing.
+5. For USB modems, the tool checks for `pyserial` and logs AT command sequences and configuration details.
+6. Transport artifacts (`transport_timeline.csv`, manifest/log files) and status chips appear in `report.html`, the JSON summary, and the browser UI.
+
+**Troubleshooting:** Missing dependencies fall back to dry-run mode with WARN telemetry. Ensure TIFF pages exist in `artifacts/<run-id>/transport/pages/` if encoding succeeds.
+
+### 3.8 Deterministic Simulation & Iterations
 
 1. Use `--iterations N --seed S` to replay negotiation sequences predictably.
 2. Simulation logs include Phase B–D events, fallback steps, and bitrates per iteration.
 3. View the negotiation timeline in the HTML report and `run.log`.
 
-### 3.8 Reporting Artifacts
+### 3.9 Reporting Artifacts
 
 After each run, inspect the following files under `artifacts/<run-id>/`:
 
@@ -183,34 +200,42 @@ After each run, inspect the following files under `artifacts/<run-id>/`:
 | `summary.csv` | Spreadsheet-friendly iteration summaries. |
 | `report.html` | Browser-ready view with chips, per-page tables, SNMP/FoIP sections, and negotiation logs. |
 | `run.log` | Plain-text log of events and connector output. |
-| `provenance.json` | Hashes, sizes, and provenance entries for reference/candidate/ingested files. |
+| `provenance.json` | Hashes, sizes, and provenance entries for reference/candidate/ingested files plus transport metadata. |
 | `telemetry.json` | Structured telemetry events emitted during execution. |
+| `transport_timeline.csv` | Negotiation timeline from the built-in T.38 or modem transport (if executed). |
 
-### 3.9 Web Report Consumption
+### 3.10 Report Consumption
 
 1. Open `artifacts/<run-id>/report.html` in any modern browser.
 2. Chips summarize Brand, Standard, Speed, ECM, Path, Location, Queue, and DID.
 3. SNMP and FoIP sections render above the per-iteration tables when data is present.
 4. Share the HTML file along with accompanying artifacts for remote reviews.
 
-### 3.10 Self-Test Utility
+### 3.11 Self-Test Utility
 
 1. Run `python -m app.tools.self_test` whenever dependencies change.
-2. The tool enumerates optional checks (Poppler, Tesseract, SMB reachability, printers).
+2. The tool enumerates optional checks (Poppler, Tesseract, SMB reachability, printers, T.38 tooling, pyserial).
 3. Review suggested fixes in the generated JSON file.
 
-### 3.11 Browser-Based Workflow
+### 3.12 Desktop GUI Workflow
 
-1. Install the optional packages listed in §1.1 (`fastapi`, `uvicorn`, `python-multipart`).
-2. Launch the web UI with `python -m app.web` (listens on `http://127.0.0.1:8000`).
-3. Open the URL in a browser, upload the reference and candidate documents, and adjust
-   options for iterations, policies, HP PC-Fax queue names, ingest directories, SNMP, or
-   FoIP validation. The UI mirrors every CLI flag and writes artifacts to the same
-   `artifacts/<run-id>/` directory.
-4. After the run completes the page renders per-iteration tables, SNMP and FoIP sections,
-   ingest manifests, and download links for HTML/CSV/JSON/log/telemetry outputs.
-5. Operators can trigger additional runs from the same browser session without touching
-   the CLI, making the workflow friendlier for teams that prefer graphical tooling.
+1. Install `PySide6` inside the project environment (`pip install PySide6`).
+2. Launch the desktop application with `python -m app.ui`.
+3. Use the file pickers to select the reference and candidate documents, then adjust
+   iterations, profiles, policies, transport options, HP PC-Fax queues, ingest folders,
+   SNMP targets, and FoIP validation as needed.
+4. Click **Run QA** to execute the pipeline in the background. Progress messages appear
+   in the log panel and the **Open artifacts folder** button opens the results directory
+   once complete.
+5. All artifacts are written under `artifacts/<run-id>/`, matching the CLI output.
+
+### 3.13 Windows Executable Workflow
+
+1. Install PyInstaller (`pip install pyinstaller`).
+2. Run `powershell -ExecutionPolicy Bypass -File scripts/build_windows_exe.ps1` from a
+   Developer PowerShell prompt.
+3. After the build finishes, navigate to `dist/QAFAXDesktop/` and launch
+   `QAFAXDesktop.exe`. The packaged application embeds the GUI and configuration files.
 
 ---
 

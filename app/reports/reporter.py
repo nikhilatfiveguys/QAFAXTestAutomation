@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 import csv
 import json
+import html
 
 from ..connectors.snmp import SNMPSnapshot
 from ..core.foip import FoipResult
 from ..core.iteration_controller import IterationResult
 from ..core.run_context import RunContext
 from ..verify.loaders import DocumentData
+from ..transport.base import FaxTransportResult
 
 
 class ReportBuilder:
@@ -36,6 +38,7 @@ class ReportBuilder:
         *,
         snmp_snapshot: SNMPSnapshot | None = None,
         foip_result: FoipResult | None = None,
+        fax_transport: FaxTransportResult | None = None,
     ) -> Path:
         path = run_dir / "summary.json"
         payload = {
@@ -49,6 +52,8 @@ class ReportBuilder:
             payload["snmp"] = snmp_snapshot.to_dict()
         if foip_result is not None:
             payload["foip"] = foip_result.to_dict()
+        if fax_transport is not None:
+            payload["transport"] = fax_transport.to_dict()
         path.write_text(json.dumps(payload, indent=2))
         return path
 
@@ -99,7 +104,11 @@ class ReportBuilder:
         path = run_dir / "report.html"
         chips = self._chips(context)
         iteration_sections = "\n".join(self._html_iteration_section(result) for result in iterations)
-        extra_sections = self._html_snmp_section(context) + self._html_foip_section(context)
+        extra_sections = (
+            self._html_transport_section(context)
+            + self._html_snmp_section(context)
+            + self._html_foip_section(context)
+        )
         html = """
 <!DOCTYPE html>
 <html>
@@ -166,6 +175,7 @@ class ReportBuilder:
             f"Seed: {context.seed}",
             f"Path Mode: {context.path_mode}",
             f"Location: {context.location}",
+            f"Transport: {context.transport_mode}",
         ]
         if context.did:
             lines.append(f"DID: {context.did}")
@@ -175,6 +185,17 @@ class ReportBuilder:
             lines.append(f"HP PC-Fax Detail: {context.pcfax_detail}")
         if context.ingest_dir:
             lines.append(f"Ingest Directory: {context.ingest_dir} pattern={context.ingest_pattern or '*'}")
+        if context.fax_transport:
+            lines.append(
+                f"Transport executed={context.fax_transport.executed} detail={context.fax_transport.detail}"
+            )
+            if context.fax_transport.errors:
+                for error in context.fax_transport.errors:
+                    lines.append(f"Transport error: {error}")
+            for artifact in context.fax_transport.artifacts:
+                lines.append(
+                    f"Transport artifact: {artifact.path} size={artifact.size} sha256={artifact.sha256}"
+                )
         if context.foip_result:
             lines.append(
                 f"FoIP validation executed={context.foip_result.executed} detail={context.foip_result.detail}"
@@ -191,6 +212,12 @@ class ReportBuilder:
                 lines.append(f"SNMP error: {error}")
             for oid, value in context.snmp_snapshot.values.items():
                 lines.append(f"SNMP {oid}: {value}")
+        if context.fax_transport and context.fax_transport.timeline:
+            lines.append("Transport timeline:")
+            for event in context.fax_transport.timeline:
+                lines.append(
+                    f"  [{event.timestamp:0.3f}] {event.phase} {event.event} :: {event.detail}"
+                )
         lines.append("")
         for result in iterations:
             verification = result.verification
@@ -213,6 +240,7 @@ class ReportBuilder:
         *,
         snmp_snapshot: SNMPSnapshot | None = None,
         foip_result: FoipResult | None = None,
+        fax_transport: FaxTransportResult | None = None,
     ) -> Path:
         payload = {
             "reference": {
@@ -233,8 +261,22 @@ class ReportBuilder:
             payload["snmp"] = snmp_snapshot.to_dict()
         if foip_result is not None:
             payload["foip"] = foip_result.to_dict()
+        if fax_transport is not None:
+            payload["transport"] = fax_transport.to_dict()
         path = run_dir / "provenance.json"
         path.write_text(json.dumps(payload, indent=2))
+        return path
+
+    def write_transport_timeline(self, run_dir: Path, context: RunContext) -> Path | None:
+        transport = context.fax_transport
+        if not transport or not transport.timeline:
+            return None
+        path = run_dir / "transport_timeline.csv"
+        with path.open("w", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["timestamp", "phase", "event", "detail"])
+            for event in transport.timeline:
+                writer.writerow([event.timestamp, event.phase, event.event, event.detail])
         return path
 
     def _chips(self, context: RunContext) -> List[str]:
@@ -245,6 +287,7 @@ class ReportBuilder:
             context.ecm_label,
             context.path_label,
             context.location,
+            context.transport_label,
         ]
         if context.did:
             chips.append(f"DID {context.did}")
@@ -292,7 +335,39 @@ class ReportBuilder:
             "candidate": str(context.candidate),
             "snmp": context.snmp_snapshot.to_dict() if context.snmp_snapshot else None,
             "foip": context.foip_result.to_dict() if context.foip_result else None,
+            "transport": context.fax_transport.to_dict() if context.fax_transport else None,
         }
+
+    def _html_transport_section(self, context: RunContext) -> str:
+        transport = context.fax_transport
+        if not transport:
+            return ""
+        status = "Executed" if transport.executed else "Dry-Run"
+        rows = "".join(
+            "<tr><td>{:.3f}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+                event.timestamp,
+                html.escape(event.phase),
+                html.escape(event.event),
+                html.escape(event.detail),
+            )
+            for event in transport.timeline
+        )
+        if not rows:
+            rows = "<tr><td colspan='4'>No timeline events recorded.</td></tr>"
+        artifact_list = "".join(
+            f"<li>{html.escape(str(record.path))} (size={record.size} sha256={record.sha256})</li>"
+            for record in transport.artifacts
+        )
+        artifacts_html = (
+            f"<ul>{artifact_list}</ul>" if artifact_list else "<p>No transport artifacts captured.</p>"
+        )
+        return (
+            "<section><h2>T.38 / Modem Transport</h2>"
+            f"<p>Mode: {html.escape(context.transport_mode.upper())} · {status} · Detail: {html.escape(transport.detail)}</p>"
+            "<table class='events'><thead><tr><th>Timestamp</th><th>Phase</th><th>Event</th><th>Detail</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table>"
+            f"<div>{artifacts_html}</div></section>"
+        )
 
     def _iteration_dict(self, result: IterationResult) -> Dict[str, object]:
         verification = result.verification

@@ -7,6 +7,7 @@ from typing import Dict, List
 import json
 import os
 import platform
+import shutil
 
 
 OPTIONAL_MODULES = [
@@ -16,6 +17,7 @@ OPTIONAL_MODULES = [
     "skimage.metrics",
     "pytesseract",
     "pyzbar",
+    "serial",
 ]
 
 
@@ -30,6 +32,12 @@ def run_self_test(ingest_dir: str | None = None, pcfax_queue: str | None = None)
     results: List[CheckResult] = []
     for module_name in OPTIONAL_MODULES:
         results.append(_check_import(module_name))
+    results.extend(
+        [
+            _check_tool("t38modem"),
+            _check_tool("pjsua"),
+        ]
+    )
     if ingest_dir:
         results.append(_check_ingest_directory(Path(ingest_dir)))
     if pcfax_queue:
@@ -68,6 +76,13 @@ def _check_printer_queue(queue_name: str) -> CheckResult:
         return CheckResult(name=f"pcfax:{queue_name}", passed=False, detail="queue not found")
     except Exception as exc:  # pragma: no cover - depends on host packages
         return CheckResult(name=f"pcfax:{queue_name}", passed=False, detail=str(exc))
+
+
+def _check_tool(tool: str) -> CheckResult:
+    path = shutil.which(tool)
+    if path:
+        return CheckResult(name=f"tool:{tool}", passed=True, detail=path)
+    return CheckResult(name=f"tool:{tool}", passed=False, detail="not found in PATH")
 
 
 def main() -> None:

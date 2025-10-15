@@ -1,3 +1,7 @@
-"""PySide6 UI stubs reserved for the desktop experience."""
+"""Desktop user interface bindings for QAFAX."""
 
-# TODO: Implement PySide6 views once the CLI MVP is hardened.
+from __future__ import annotations
+
+__all__ = ["launch_gui"]
+
+from .gui import launch as launch_gui

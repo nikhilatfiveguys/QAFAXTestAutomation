@@ -28,6 +28,12 @@ class ExecuteRunTests(unittest.TestCase):
             self.assertTrue((result.run_dir / "report.html").is_file())
             summary = json.loads((result.run_dir / "summary.json").read_text())
             self.assertEqual(summary["run"]["id"], "unit-test")
+            self.assertIn("transport", summary["run"])
+            self.assertIsNone(summary["run"]["transport"])
+            self.assertNotIn("transport", summary)
+            self.assertEqual(result.context.transport_mode, "sim")
+            self.assertIsNone(result.fax_transport)
+            self.assertNotIn("transport_timeline_csv", result.generated_files)
 
 
 if __name__ == "__main__":  # pragma: no cover
