@@ -17,12 +17,30 @@ artifacts suitable for QA review packages.
   optional SNMP snapshots, and FoIP/T.38 validation attempts
 - Optional self-test tool that checks for optional dependencies and environment readiness
 
-## Getting Started
+## First-Time Setup (Summary)
 
-1. Ensure Python 3.11 or newer is installed. The CLI runs without third-party dependencies
-   but will take advantage of libraries such as NumPy, Pillow, pdf2image, and PyWin32 when
-   present.
-2. Run the CLI with a reference and candidate document:
+For the full walkthrough, see the [User Guide](docs/USER_GUIDE.md). The condensed steps
+below help you run the CLI quickly:
+
+1. Install Python 3.11 or newer and clone this repository. Optional dependencies (NumPy,
+   Pillow, pdf2image, OpenCV, scikit-image, PyWin32, pytesseract, pyzbar) unlock additional
+   metrics and connectors but are not required for basic runs.
+2. Create a virtual environment and install whichever optional packages you need:
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Windows: .venv\Scripts\activate
+   pip install --upgrade pip
+   pip install numpy Pillow pdf2image opencv-python scikit-image pywin32 pytesseract pyzbar
+   ```
+
+3. Validate your environment with the self-test utility:
+
+   ```bash
+   python -m app.tools.self_test
+   ```
+
+4. Run the CLI with a reference and candidate document:
 
    ```bash
    python -m app.main docs/samples/control_reference.txt docs/samples/control_candidate.txt \
@@ -41,7 +59,7 @@ artifacts suitable for QA review packages.
    - `--foip-config` to execute a FoIP/T.38 validation workflow defined by a JSON config
    - `--require-ocr` and `--require-barcode` to promote optional metrics to hard gates
 
-3. Inspect the generated artifacts under `artifacts/<run-id>/`:
+5. Inspect the generated artifacts under `artifacts/<run-id>/`:
 
    - `summary.json` — full run metadata, per-iteration metrics, optional ingest manifest,
      SNMP snapshots, FoIP results, and telemetry
