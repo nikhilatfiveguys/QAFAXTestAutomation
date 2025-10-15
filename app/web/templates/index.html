@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fax QA Automation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background: #f5f7fa;
+      color: #1a202c;
+    }
+    body {
+      margin: 0;
+      padding: 0 0 4rem;
+    }
+    header {
+      background: linear-gradient(135deg, #0f4c81, #1b6ca8);
+      color: #fff;
+      padding: 2.5rem 1.5rem 2rem;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2.25rem;
+    }
+    header p {
+      margin: 0.5rem 0 0;
+      max-width: 720px;
+      line-height: 1.5;
+      color: rgba(255, 255, 255, 0.9);
+    }
+    main {
+      max-width: 1100px;
+      margin: -3rem auto 0;
+      padding: 0 1.5rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 14px 28px rgba(15, 76, 129, 0.08);
+      border: 1px solid rgba(15, 76, 129, 0.1);
+    }
+    form {
+      display: grid;
+      gap: 1.25rem;
+    }
+    .form-grid {
+      display: grid;
+      gap: 1.25rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      align-items: end;
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #2d3748;
+    }
+    input[type="file"],
+    select,
+    input[type="number"] {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid #cbd5e0;
+      background: #fdfdff;
+      font-size: 0.95rem;
+      color: #1a202c;
+    }
+    input[type="file"] {
+      padding: 0.75rem;
+    }
+    button {
+      border: none;
+      padding: 0.85rem 1.4rem;
+      border-radius: 999px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, #1b6ca8, #0f4c81);
+      color: #fff;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      justify-self: start;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(15, 76, 129, 0.2);
+    }
+    .note {
+      font-size: 0.9rem;
+      color: #4a5568;
+      margin-top: -0.75rem;
+    }
+    .alert {
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+    }
+    .alert.error {
+      background: rgba(183, 28, 28, 0.1);
+      color: #8b0000;
+      border: 1px solid rgba(183, 28, 28, 0.3);
+    }
+    .result-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.85rem;
+      border-radius: 999px;
+      background: rgba(15, 76, 129, 0.1);
+      color: #0f4c81;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .reports {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .reports a {
+      text-decoration: none;
+      padding: 0.6rem 1rem;
+      border-radius: 999px;
+      background: rgba(27, 108, 168, 0.15);
+      color: #0f4c81;
+      font-weight: 600;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+    }
+    th, td {
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      padding: 0.75rem 0.6rem;
+      vertical-align: top;
+    }
+    th {
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      color: #4a5568;
+    }
+    .status {
+      font-weight: 700;
+      padding: 0.3rem 0.6rem;
+      border-radius: 8px;
+      display: inline-block;
+    }
+    .status.PASS { background: rgba(27, 94, 32, 0.12); color: #1b5e20; }
+    .status.WARN { background: rgba(245, 127, 23, 0.16); color: #f57f17; }
+    .status.FAIL { background: rgba(183, 28, 28, 0.12); color: #b71c1c; }
+    .status.SKIP { background: rgba(55, 71, 79, 0.12); color: #37474f; }
+    details {
+      margin-top: 0.75rem;
+      background: #f7fafc;
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      border: 1px solid #e2e8f0;
+    }
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: #1b6ca8;
+    }
+    ul {
+      margin: 0.75rem 0 0;
+      padding-left: 1.25rem;
+    }
+    ul li {
+      margin-bottom: 0.35rem;
+    }
+    @media (max-width: 640px) {
+      header {
+        padding: 2rem 1.25rem 1.75rem;
+      }
+      header h1 {
+        font-size: 1.9rem;
+      }
+      .card {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Fax QA Automation</h1>
+    <p>Upload a reference document and a candidate capture to simulate a fax run, execute the verification pipeline, and review quality metrics without leaving your browser.</p>
+  </header>
+  <main>
+    <section class="card">
+      <h2>Run a QA Session</h2>
+      <p class="note">Files are processed locally by the simulator and verification pipeline. Generated reports are saved in the <code>artifacts/web</code> directory.</p>
+      {% if error %}
+        <div class="alert error">{{ error }}</div>
+      {% endif %}
+      <form method="post" enctype="multipart/form-data" action="{{ request.url_for('index') }}">
+        <div class="form-grid">
+          <div>
+            <label for="reference">Reference document</label>
+            <input type="file" id="reference" name="reference" required />
+          </div>
+          <div>
+            <label for="candidate">Candidate document</label>
+            <input type="file" id="candidate" name="candidate" required />
+          </div>
+          <div>
+            <label for="profile">Brand profile</label>
+            <select id="profile" name="profile" required>
+              <option value="" disabled {% if not form_values.profile %}selected{% endif %}>Select a profile</option>
+              {% for profile in profiles %}
+                <option value="{{ profile }}" {% if form_values.profile == profile %}selected{% endif %}>{{ profile }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="policy">Verification policy</label>
+            <select id="policy" name="policy">
+              {% for policy in policies %}
+                <option value="{{ policy }}" {% if form_values.policy == policy %}selected{% endif %}>{{ policy }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="iterations">Iterations</label>
+            <input type="number" id="iterations" name="iterations" min="1" value="{{ form_values.iterations }}" />
+          </div>
+          <div>
+            <label for="seed">Seed</label>
+            <input type="number" id="seed" name="seed" value="{{ form_values.seed }}" />
+          </div>
+        </div>
+        <button type="submit">Simulate and Verify</button>
+      </form>
+    </section>
+
+    {% if result %}
+      <section class="card">
+        <div class="result-header">
+          <div>
+            <h2>Results for {{ result.run_id }}</h2>
+            <div class="chip">Iterations: {{ result.iterations | length }}</div>
+          </div>
+          <div class="reports">
+            <a href="{{ request.url_for('artifacts', path=result.reports.html) }}" target="_blank" rel="noopener">HTML report</a>
+            <a href="{{ request.url_for('artifacts', path=result.reports.json) }}" target="_blank" rel="noopener">JSON report</a>
+            <a href="{{ request.url_for('artifacts', path=result.reports.csv) }}" target="_blank" rel="noopener">CSV report</a>
+          </div>
+        </div>
+        {% for iteration in result.iterations %}
+          <article>
+            <h3>Iteration {{ iteration.index }}</h3>
+            {% if iteration.verification %}
+              <p><span class="chip">Verdict: <strong>{{ iteration.verification.verdict }}</strong></span></p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Metric</th>
+                    <th>Status</th>
+                    <th>Value</th>
+                    <th>Detail</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for metric in iteration.verification.metrics %}
+                    <tr>
+                      <td>{{ metric.name }}</td>
+                      <td><span class="status {{ metric.status }}">{{ metric.status }}</span></td>
+                      <td>{% if metric.value is not none %}{{ '%.4f'|format(metric.value) }}{% else %}—{% endif %}</td>
+                      <td>{{ metric.detail }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <details>
+                <summary>T.30 negotiation log</summary>
+                <ul>
+                  {% for event in iteration.simulation.events %}
+                    <li><strong>{{ event.timestamp }}s</strong> — [{{ event.phase }}] {{ event.event }} <em>{{ event.detail }}</em></li>
+                  {% endfor %}
+                </ul>
+              </details>
+            {% else %}
+              <p>No verification summary was produced.</p>
+            {% endif %}
+          </article>
+          {% if not loop.last %}<hr />{% endif %}
+        {% endfor %}
+      </section>
+    {% endif %}
+  </main>
+</body>
+</html>
