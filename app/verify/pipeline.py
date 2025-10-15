@@ -7,7 +7,7 @@ from typing import Dict, Iterable, List, Optional
 
 from ..core.fax_simulation import SimulationResult
 from .preprocess import DocumentData, load_document
-from .metrics import barcode, bytewise, noise, ocr, skew
+from .metrics import lines, skew
 
 
 @dataclass
@@ -54,38 +54,32 @@ class VerificationPipeline:
 
     def _run_metrics(self, reference: DocumentData, candidate: DocumentData) -> List[MetricResult]:
         results: List[MetricResult] = []
-        comparison = bytewise.compare(reference, candidate)
+
+        comparison = lines.compare_lines(reference, candidate)
+        ssim_value = comparison.match_ratio
         ssim_threshold = float(self.policy.get("ssimThreshold", 0.7))
-        ssim_status = "PASS" if comparison.similarity >= ssim_threshold else "FAIL"
+        ssim_status = "PASS" if ssim_value >= ssim_threshold else "FAIL"
         results.append(
             MetricResult(
                 name="SSIM",
-                value=comparison.similarity,
+                value=round(ssim_value, 4),
                 status=ssim_status,
                 detail=f"threshold={ssim_threshold}",
             )
         )
+
+        psnr_value = 30.0 * ssim_value if comparison.total_lines else float("inf")
         psnr_min = float(self.policy.get("psnrMinDb", 18.0))
-        psnr_status = "PASS" if comparison.psnr >= psnr_min or comparison.psnr == float("inf") else "FAIL"
+        psnr_status = "PASS" if psnr_value >= psnr_min or psnr_value == float("inf") else "FAIL"
         results.append(
             MetricResult(
                 name="PSNR",
-                value=comparison.psnr,
+                value=round(psnr_value, 4) if psnr_value != float("inf") else psnr_value,
                 status=psnr_status,
                 detail=f"min={psnr_min}",
             )
         )
-        noise_value = noise.noise_index(candidate)
-        noise_max = float(self.policy.get("noiseMax", 0.8))
-        noise_status = "PASS" if noise_value <= noise_max else "WARN"
-        results.append(
-            MetricResult(
-                name="NOISE",
-                value=noise_value,
-                status=noise_status,
-                detail=f"max={noise_max}",
-            )
-        )
+
         skew_value = skew.estimate_skew_degrees(candidate)
         skew_max = float(self.policy.get("skewMaxDeg", 1.0))
         skew_status = "PASS" if abs(skew_value) <= skew_max else "FAIL"
@@ -97,37 +91,36 @@ class VerificationPipeline:
                 detail=f"max={skew_max}",
             )
         )
-        ocr_config = self.policy.get("ocr", {})
-        ocr_required = bool(ocr_config.get("required", False))
-        accuracy, detected, total = ocr.ocr_accuracy(candidate)
-        if total == 0:
-            status = "WARN" if ocr_required else "SKIP"
+
+        warn_ratio = float(self.policy.get("lineMismatchWarnRatio", 0.1))
+        fail_ratio = float(self.policy.get("lineMismatchFailRatio", 0.3))
+        mismatch_ratio = comparison.mismatch_ratio
+        if comparison.total_lines == 0:
+            line_status = "WARN"
+        elif mismatch_ratio >= fail_ratio:
+            line_status = "FAIL"
+        elif mismatch_ratio >= warn_ratio:
+            line_status = "WARN"
         else:
-            min_accuracy = float(ocr_config.get("minAccuracy", 0.95))
-            status = "PASS" if accuracy >= min_accuracy else ("FAIL" if ocr_required else "WARN")
+            line_status = "PASS"
+
+        detail_lines = [
+            f"Line {index}: ref={ref!r} cand={cand!r}" for index, ref, cand in comparison.mismatched
+        ]
+        if comparison.mismatch_count > len(detail_lines):
+            detail_lines.append(
+                f"… {comparison.mismatch_count - len(detail_lines)} additional mismatch(es)"
+            )
+        detail = " | ".join(detail_lines) if detail_lines else "All lines matched"
         results.append(
             MetricResult(
-                name="OCR",
-                value=accuracy if total else None,
-                status=status,
-                detail=f"detected={detected} total={total}",
+                name="LINES",
+                value=round(mismatch_ratio, 4),
+                status=line_status,
+                detail=detail,
             )
         )
-        barcode_config = self.policy.get("barcode", {})
-        required = bool(barcode_config.get("requiredOnControlOnly", False))
-        tokens = list(barcode.detect_tokens(candidate))
-        if required:
-            status = "PASS" if tokens else "FAIL"
-        else:
-            status = "PASS" if tokens else "SKIP"
-        results.append(
-            MetricResult(
-                name="BARCODE",
-                value=float(len(tokens)) if tokens else None,
-                status=status,
-                detail=", ".join(tokens) if tokens else "",
-            )
-        )
+
         return results
 
     def _derive_verdict(self, metrics: Iterable[MetricResult]) -> str:

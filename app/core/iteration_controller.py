@@ -1,4 +1,4 @@
-"""High level orchestration for running fax simulations and verification."""
+"""Iteration orchestration for the fax QA CLI MVP."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -40,6 +40,7 @@ class IterationController:
         results: List[IterationResult] = []
         seed = iteration_config.rng_seed
         for index in range(iteration_config.iterations):
+            self.telemetry.emit("iteration.start", index=index, seed=seed + index)
             simulation = FaxSimulation(profile=self.profile, seed=seed + index).run()
             self.telemetry.emit(
                 "simulation.completed",
@@ -48,9 +49,21 @@ class IterationController:
                 fallback_steps=simulation.fallback_steps,
             )
             summary = self.pipeline.verify_pair(reference, candidate, simulation)
+            self.telemetry.emit(
+                "verification.completed",
+                index=index,
+                verdict=summary.verdict,
+                policy_hash=summary.policy_hash,
+            )
             results.append(IterationResult(index=index, simulation=simulation, verification=summary))
         return results
 
     def iter_events(self) -> Iterable[dict]:
         for event in self.telemetry.as_list():
             yield event.to_json()
+
+    @property
+    def telemetry_sink(self) -> TelemetrySink:
+        """Expose the underlying telemetry collector for persistence."""
+
+        return self.telemetry
