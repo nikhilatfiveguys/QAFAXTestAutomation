@@ -6,6 +6,7 @@ dist/
 
 # PyInstaller cache
 *.spec
+!scripts/qafax_desktop.spec
 
 # Virtual environments
 .venv/

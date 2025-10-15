@@ -78,8 +78,9 @@ below help you run the CLI quickly:
 
 ## Desktop GUI
 
-Operators who prefer a Windows desktop experience can install `PySide6` and launch
-the PyQt-based interface:
+Operators who prefer a Windows desktop experience can install `PySide6` when running
+from source or use the packaged executable described below. To run the GUI directly
+from Python:
 
 ```bash
 pip install PySide6
@@ -94,17 +95,21 @@ artifacts appear in the window without blocking the interface.
 
 ## Windows Executable Build
 
-To distribute the desktop UI without requiring Python, bundle it into a standalone
-`.exe` using PyInstaller (install `pyinstaller` first):
+To distribute the desktop UI without requiring Python or manual dependency installs,
+bundle it into a standalone `.exe` using PyInstaller. Build the executable from a
+Windows environment where the optional feature libraries are installed (for example
+`pip install PySide6 Pillow numpy pdf2image pytesseract pyzbar pyserial smbprotocol pywin32`).
 
 ```powershell
 pip install pyinstaller
 powershell -ExecutionPolicy Bypass -File scripts/build_windows_exe.ps1
 ```
 
-The script produces `dist/QAFAXDesktop/QAFAXDesktop.exe` with the GUI entry point and
-bundled configuration/templates (`config/`, `docs/`). Sign the resulting binary according
-to your deployment policies before sharing it with QA operators.
+The PowerShell helper invokes `PyInstaller` with `scripts/qafax_desktop.spec`, which
+automatically collects the optional packages when present and embeds `config/` and
+`docs/` so `dist/QAFAXDesktop/QAFAXDesktop.exe` runs on clean operator workstations
+without additional downloads. Sign the resulting binary according to your deployment
+policies before distribution.
 
 ## Configuration
 

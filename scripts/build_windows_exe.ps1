@@ -5,19 +5,13 @@ param(
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
+$specPath = Resolve-Path (Join-Path $PSScriptRoot "qafax_desktop.spec")
 $command = @(
     $Python, "-m", "PyInstaller",
     "--clean",
     "--noconfirm",
-    "--name", "QAFAXDesktop",
-    "--windowed",
-    "--add-data", "config;config",
-    "--add-data", "docs;docs",
-    "app\\ui\\__main__.py"
+    $specPath
 )
 
 Write-Host "Running" ($command -join " ")
-& $Python -m PyInstaller --clean --noconfirm --name QAFAXDesktop --windowed \
-    --add-data "config;config" \
-    --add-data "docs;docs" \
-    app\\ui\\__main__.py
+& $Python -m PyInstaller --clean --noconfirm $specPath

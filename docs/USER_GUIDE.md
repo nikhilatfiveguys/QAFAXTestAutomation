@@ -231,11 +231,15 @@ After each run, inspect the following files under `artifacts/<run-id>/`:
 
 ### 3.13 Windows Executable Workflow
 
-1. Install PyInstaller (`pip install pyinstaller`).
+1. Install PyInstaller (`pip install pyinstaller`) and the optional runtime libraries you
+   plan to ship (for example `pip install PySide6 Pillow numpy pdf2image pytesseract
+   pyzbar pyserial smbprotocol pywin32`).
 2. Run `powershell -ExecutionPolicy Bypass -File scripts/build_windows_exe.ps1` from a
    Developer PowerShell prompt.
 3. After the build finishes, navigate to `dist/QAFAXDesktop/` and launch
-   `QAFAXDesktop.exe`. The packaged application embeds the GUI and configuration files.
+   `QAFAXDesktop.exe`. The packaged application embeds the GUI, configuration files, and
+   any installed optional dependencies so QA operators can run it without extra
+   downloads.
 
 ---
 
