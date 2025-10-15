@@ -1,1 +1,80 @@
-# QAFAXTestAutomation
+# QAFAX Test Automation
+
+This repository delivers the minimal viable Fax QA automation CLI described in the
+engineering plan. It now includes image-ready verification scaffolding, HP PC-Fax queue
+submission hooks, ingest polling for print-scan workflows, and reproducible reporting
+artifacts suitable for QA review packages.
+
+## Features
+
+- Seeded T.30 negotiation simulator with V.34/V.17 metadata and fallback logging
+- Verification pipeline that loads text or images, applies optional preprocessing, and
+  reports SSIM/PSNR/SKEW/NOISE/MTF/OCR/BARCODE/LINES metrics with policy-driven verdicts
+- JSON/CSV/HTML reports, a plain-text run log, telemetry export, and a provenance manifest
+  under `artifacts/<run-id>/`
+- Configurable device profiles and verification policies loaded from `config/`
+- Metadata capture for DID, HP PC-Fax queue submissions, and ingest directory monitoring
+- Optional self-test tool that checks for optional dependencies and environment readiness
+
+## Getting Started
+
+1. Ensure Python 3.11 or newer is installed. The CLI runs without third-party dependencies
+   but will take advantage of libraries such as NumPy, Pillow, pdf2image, and PyWin32 when
+   present.
+2. Run the CLI with a reference and candidate document:
+
+   ```bash
+   python -m app.main docs/samples/control_reference.txt docs/samples/control_candidate.txt \
+     --iterations 3 --seed 42 --run-id demo
+   ```
+
+   Optional flags:
+
+   - `--profile` / `--policy` to load different configuration files
+   - `--path {digital|print-scan}` to record the path chips in reports (default: `digital`)
+   - `--did` to log the dialed DID
+   - `--pcfax-queue` to attempt an HP PC-Fax submission (Windows + PyWin32 required)
+   - `--ingest-dir` / `--ingest-pattern` / `--ingest-timeout` / `--ingest-interval` to poll a
+     scan folder for new artifacts after each run
+   - `--require-ocr` and `--require-barcode` to promote optional metrics to hard gates
+
+3. Inspect the generated artifacts under `artifacts/<run-id>/`:
+
+   - `summary.json` — full run metadata, per-iteration metrics, optional ingest manifest, and telemetry
+   - `summary.csv` — iteration summaries suitable for spreadsheets
+   - `report.html` — human-friendly view with chips and negotiation logs
+   - `run.log` — text log of Phase B→D events for every iteration
+   - `provenance.json` — hashes, sizes, and ingest provenance for reproducibility
+   - `telemetry.json` — structured telemetry emitted during execution
+
+## Configuration
+
+Device profiles live under `config/profiles/` and verification policies under
+`config/verify_policy.*.json`. Each run records the SHA-256 hash of the loaded profile and
+policy so operators can reproduce results. Policies now include preprocessing preferences
+and optional metric gates that can be tightened per site.
+
+## Self-Test
+
+Validate optional tooling and environment prerequisites with:
+
+```bash
+python -m app.tools.self_test
+```
+
+The tool writes `artifacts/self_test.json` with pass/fail results.
+
+## Testing
+
+Basic unit tests cover configuration loading, simulation determinism, and report writers.
+Run them with:
+
+```bash
+python -m unittest
+```
+
+## Roadmap
+
+The CLI codebase is structured to grow into the full desktop application described in
+`docs/ENGINEERING_PLAN.md`. Stub packages (e.g., connectors, privacy, remote) remain in the
+repository for future expansion.
