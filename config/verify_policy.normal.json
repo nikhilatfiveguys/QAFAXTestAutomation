@@ -1,0 +1,11 @@
+{
+  "policy": {
+    "hard": ["SSIM", "PSNR", "SKEW", "LINES"],
+    "warn": []
+  },
+  "ssimThreshold": 0.7,
+  "psnrMinDb": 18.0,
+  "skewMaxDeg": 1.0,
+  "lineMismatchWarnRatio": 0.1,
+  "lineMismatchFailRatio": 0.3
+}
