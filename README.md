@@ -93,6 +93,25 @@ T.38, USB modem), toggle HP PC-Fax submission, ingest polling, SNMP snapshots,
 and FoIP validation. Execution happens in a background thread so progress logs and
 artifacts appear in the window without blocking the interface.
 
+## Download Prebuilt Windows Executable
+
+Every push to the `main` branch and any published GitHub release triggers the
+**Build QAFAX Desktop Executable** workflow. The automation installs the
+optional feature libraries, runs the unit test suite, builds the packaged GUI
+via `pyinstaller`, and publishes a `QAFAXDesktop.zip` artifact. You can obtain
+the self-contained executable in two ways:
+
+1. Navigate to **Actions → Build QAFAX Desktop Executable → latest successful
+   run** and download the `QAFAXDesktop.zip` artifact. The archive contains the
+   bundled `QAFAXDesktop.exe`, configuration files, and documentation.
+2. When tagging a release, the workflow automatically uploads the same archive
+   to the release assets so operators can fetch it directly from the release
+   page.
+
+The packaged build embeds PySide6, optional verification dependencies, and the
+`config/` + `docs/` trees, so Windows users can launch the desktop app without
+installing Python or extra wheels.
+
 ## Windows Executable Build
 
 To distribute the desktop UI without requiring Python or manual dependency installs,

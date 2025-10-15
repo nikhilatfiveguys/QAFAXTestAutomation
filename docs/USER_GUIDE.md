@@ -231,6 +231,14 @@ After each run, inspect the following files under `artifacts/<run-id>/`:
 
 ### 3.13 Windows Executable Workflow
 
+**Download from GitHub:** Every push to `main` and each published release triggers the
+GitHub Actions workflow named **Build QAFAX Desktop Executable**. Open the latest
+successful run under the Actions tab (or the release page) to download the
+`QAFAXDesktop.zip` archive, which contains the ready-to-run executable plus bundled
+configs and documentation.
+
+**Build locally (optional):**
+
 1. Install PyInstaller (`pip install pyinstaller`) and the optional runtime libraries you
    plan to ship (for example `pip install PySide6 Pillow numpy pdf2image pytesseract
    pyzbar pyserial smbprotocol pywin32`).
