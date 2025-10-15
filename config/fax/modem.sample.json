@@ -1,0 +1,13 @@
+{
+  "port": "COM3",
+  "baud": 115200,
+  "class": 1,
+  "ecm": true,
+  "maxBitrate": 14400,
+  "flowControl": "hardware",
+  "extraInit": ["ATZ"],
+  "timeouts": {
+    "setupSec": 45,
+    "pageSec": 180
+  }
+}

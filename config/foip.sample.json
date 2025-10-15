@@ -1,0 +1,8 @@
+{
+  "description": "Sample FoIP run using an external SIP tool",
+  "command": ["pjsua", "--config", "config/pjsua.cfg"],
+  "workingDirectory": ".",
+  "artifactDirectory": "artifacts/foip",
+  "artifactPattern": "*.tif",
+  "timeout": 120
+}
