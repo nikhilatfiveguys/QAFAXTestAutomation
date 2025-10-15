@@ -46,21 +46,28 @@ class ReportBuilderTestCase(unittest.TestCase):
             did=None,
             pcfax_queue=None,
             started_at=datetime.utcnow(),
+            ingest_dir=None,
+            ingest_pattern=None,
+            pcfax_detail=None,
         )
         telemetry = list(controller.iter_events())
 
         with TemporaryDirectory() as tmpdir:
             builder = ReportBuilder(Path(tmpdir))
             run_dir = builder.ensure_run_directory(context.run_id)
-            builder.write_json(run_dir, context, results, telemetry)
+            builder.write_json(run_dir, context, results, telemetry, [])
             builder.write_csv(run_dir, context, results)
             builder.write_html(run_dir, context, results)
             builder.write_run_log(run_dir, context, results)
+            reference_doc = results[0].verification.reference  # type: ignore[union-attr]
+            candidate_doc = results[0].verification.candidate  # type: ignore[union-attr]
+            builder.write_provenance(run_dir, reference_doc, candidate_doc, [])
 
             self.assertTrue((run_dir / "summary.json").is_file())
             self.assertTrue((run_dir / "summary.csv").is_file())
             self.assertTrue((run_dir / "report.html").is_file())
             self.assertTrue((run_dir / "run.log").is_file())
+            self.assertTrue((run_dir / "provenance.json").is_file())
 
             summary = json.loads((run_dir / "summary.json").read_text())
             self.assertEqual(summary["run"]["id"], "test")

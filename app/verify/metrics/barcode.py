@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ..preprocess import DocumentData
+from ..loaders import DocumentData
 
 
 KNOWN_TOKENS = {"QR", "BARCODE", "CODE128", "CODE39"}

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Tuple
 
-from ..preprocess import DocumentData
+from ..loaders import DocumentData
 
 
 def ocr_accuracy(doc: DocumentData) -> Tuple[float, int, int]:

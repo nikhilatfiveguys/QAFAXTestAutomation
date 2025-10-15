@@ -1,10 +1,10 @@
-"""Line-based comparison helpers for placeholder verification results."""
+"""Line-based comparison helpers for verification and fallbacks."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Iterable, List, Sequence, Tuple
 
-from ..preprocess import DocumentData
+from ..loaders import DocumentData
 
 
 @dataclass
@@ -31,12 +31,18 @@ class LineComparison:
 
 
 def compare_lines(reference: DocumentData, candidate: DocumentData, max_mismatches: int = 10) -> LineComparison:
-    total = max(len(reference.lines), len(candidate.lines))
+    return compare_sequences(reference.lines, candidate.lines, max_mismatches=max_mismatches)
+
+
+def compare_sequences(
+    reference_lines: Sequence[str], candidate_lines: Sequence[str], max_mismatches: int = 10
+) -> LineComparison:
+    total = max(len(reference_lines), len(candidate_lines))
     matching = 0
     mismatched: List[Tuple[int, str, str]] = []
     for index in range(total):
-        ref_line = reference.lines[index] if index < len(reference.lines) else ""
-        cand_line = candidate.lines[index] if index < len(candidate.lines) else ""
+        ref_line = reference_lines[index] if index < len(reference_lines) else ""
+        cand_line = candidate_lines[index] if index < len(candidate_lines) else ""
         if ref_line == cand_line:
             matching += 1
         elif len(mismatched) < max_mismatches:

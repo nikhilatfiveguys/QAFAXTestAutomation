@@ -1,11 +1,16 @@
 {
   "policy": {
     "hard": ["SSIM", "PSNR", "SKEW", "LINES"],
-    "warn": []
+    "warn": ["NOISE", "OCR", "BARCODE", "MTF", "ALIGNMENT"]
   },
   "ssimThreshold": 0.7,
   "psnrMinDb": 18.0,
   "skewMaxDeg": 1.0,
+  "noiseWarn": 0.12,
   "lineMismatchWarnRatio": 0.1,
-  "lineMismatchFailRatio": 0.3
+  "lineMismatchFailRatio": 0.3,
+  "mtf": {"mtf50Min": 0.25},
+  "ocr": {"required": false, "minAccuracy": 0.95, "langs": ["eng"]},
+  "barcode": {"required": false},
+  "preprocess": {"dpi": 300, "deskew": true, "denoise": true, "grayscale": true}
 }

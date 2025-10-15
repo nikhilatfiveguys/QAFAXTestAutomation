@@ -1,22 +1,27 @@
 # QAFAX Test Automation
 
 This repository delivers the minimal viable Fax QA automation CLI described in the
-engineering plan. It simulates deterministic fax negotiations, compares reference and
-candidate documents line-by-line, and writes structured reports that can be shared with
-operators and device vendors.
+engineering plan. It now includes image-ready verification scaffolding, HP PC-Fax queue
+submission hooks, ingest polling for print-scan workflows, and reproducible reporting
+artifacts suitable for QA review packages.
 
 ## Features
 
 - Seeded T.30 negotiation simulator with V.34/V.17 metadata and fallback logging
-- Lightweight verification pipeline with placeholder SSIM/PSNR/SKEW/LINES metrics
-- JSON/CSV/HTML reports plus a plain-text run log under `artifacts/<run-id>/`
+- Verification pipeline that loads text or images, applies optional preprocessing, and
+  reports SSIM/PSNR/SKEW/NOISE/MTF/OCR/BARCODE/LINES metrics with policy-driven verdicts
+- JSON/CSV/HTML reports, a plain-text run log, telemetry export, and a provenance manifest
+  under `artifacts/<run-id>/`
 - Configurable device profiles and verification policies loaded from `config/`
-- Metadata capture for DID and HP PC-Fax queues to support workflow handoffs
+- Metadata capture for DID, HP PC-Fax queue submissions, ingest directory monitoring,
+  optional SNMP snapshots, and FoIP/T.38 validation attempts
+- Optional self-test tool that checks for optional dependencies and environment readiness
 
 ## Getting Started
 
-1. Ensure Python 3.11 or newer is installed. No third-party packages are required for the
-   CLI MVP.
+1. Ensure Python 3.11 or newer is installed. The CLI runs without third-party dependencies
+   but will take advantage of libraries such as NumPy, Pillow, pdf2image, and PyWin32 when
+   present.
 2. Run the CLI with a reference and candidate document:
 
    ```bash
@@ -29,21 +34,40 @@ operators and device vendors.
    - `--profile` / `--policy` to load different configuration files
    - `--path {digital|print-scan}` to record the path chips in reports (default: `digital`)
    - `--did` to log the dialed DID
-   - `--pcfax-queue` to record an HP PC-Fax queue name
+   - `--pcfax-queue` to attempt an HP PC-Fax submission (Windows + PyWin32 required)
+   - `--ingest-dir` / `--ingest-pattern` / `--ingest-timeout` / `--ingest-interval` to poll a
+     scan folder for new artifacts after each run
+   - `--snmp-target` / `--snmp-community` / `--snmp-oids` to collect printer counters via SNMP
+   - `--foip-config` to execute a FoIP/T.38 validation workflow defined by a JSON config
+   - `--require-ocr` and `--require-barcode` to promote optional metrics to hard gates
 
 3. Inspect the generated artifacts under `artifacts/<run-id>/`:
 
-   - `summary.json` — full run metadata, per-iteration metrics, and telemetry
+   - `summary.json` — full run metadata, per-iteration metrics, optional ingest manifest,
+     SNMP snapshots, FoIP results, and telemetry
    - `summary.csv` — iteration summaries suitable for spreadsheets
    - `report.html` — human-friendly view with chips and negotiation logs
    - `run.log` — text log of Phase B→D events for every iteration
+   - `provenance.json` — hashes, sizes, and ingest provenance for reproducibility
    - `telemetry.json` — structured telemetry emitted during execution
 
 ## Configuration
 
-Device profiles live under `config/profiles/` and verification policies under
-`config/verify_policy.*.json`. Each run records the SHA-256 hash of the loaded profile and
-policy so operators can reproduce results.
+Device profiles live under `config/profiles/`, verification policies under
+`config/verify_policy.*.json`, and FoIP samples in `config/foip.sample.json`. Each run
+records the SHA-256 hash of the loaded profile and policy so operators can reproduce
+results. Policies now include preprocessing preferences and optional metric gates that can
+be tightened per site.
+
+## Self-Test
+
+Validate optional tooling and environment prerequisites with:
+
+```bash
+python -m app.tools.self_test
+```
+
+The tool writes `artifacts/self_test.json` with pass/fail results.
 
 ## Testing
 
