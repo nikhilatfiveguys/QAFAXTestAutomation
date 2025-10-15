@@ -48,7 +48,24 @@ class VerificationPipeline:
         candidate_raw = load_document(candidate_path)
         reference, ref_report = apply_preprocess(reference_raw, self.preprocess_options)
         candidate, cand_report = apply_preprocess(candidate_raw, self.preprocess_options)
-        _, alignment_warnings = align.align_documents(reference, candidate)
+        page_pairs, alignment_warnings = align.align_documents(reference, candidate)
+        if page_pairs:
+            aligned_reference = DocumentData(
+                path=reference.path,
+                content=reference.content,
+                sha256=reference.sha256,
+                pages=[pair.reference for pair in page_pairs],
+                warnings=list(reference.warnings),
+            )
+            aligned_candidate = DocumentData(
+                path=candidate.path,
+                content=candidate.content,
+                sha256=candidate.sha256,
+                pages=[pair.candidate for pair in page_pairs],
+                warnings=list(candidate.warnings),
+            )
+            reference = aligned_reference
+            candidate = aligned_candidate
         line_comparison = lines.compare_lines(reference, candidate)
         metrics = self._run_metrics(reference, candidate, line_comparison, alignment_warnings)
         verdict = self._derive_verdict(metrics)

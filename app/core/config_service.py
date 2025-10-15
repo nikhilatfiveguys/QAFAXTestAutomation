@@ -53,6 +53,12 @@ class ConfigService:
             return None
         return self.load(relative_path)
 
+    @property
+    def base_path(self) -> Path:
+        """Expose the configuration root for callers that need to enumerate files."""
+
+        return self._base_path
+
 
 def default_config_service() -> ConfigService:
     """Helper that uses the repository's ``config`` directory as the base path."""

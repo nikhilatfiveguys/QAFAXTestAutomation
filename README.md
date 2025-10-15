@@ -10,6 +10,8 @@ artifacts suitable for QA review packages.
 - Seeded T.30 negotiation simulator with V.34/V.17 metadata and fallback logging
 - Verification pipeline that loads text or images, applies optional preprocessing, and
   reports SSIM/PSNR/SKEW/NOISE/MTF/OCR/BARCODE/LINES metrics with policy-driven verdicts
+- Content-aware page alignment that automatically reorders scans and offers a manual
+  override prompt when confidence is low
 - JSON/CSV/HTML reports, a plain-text run log, telemetry export, and a provenance manifest
   under `artifacts/<run-id>/`
 - Configurable device profiles and verification policies loaded from `config/`
@@ -68,6 +70,32 @@ below help you run the CLI quickly:
    - `run.log` — text log of Phase B→D events for every iteration
    - `provenance.json` — hashes, sizes, and ingest provenance for reproducibility
    - `telemetry.json` — structured telemetry emitted during execution
+
+## Web Interface
+
+The entire workflow is also available through a browser-based UI powered by FastAPI.
+
+1. Install the optional dependencies:
+
+   ```bash
+   pip install fastapi uvicorn python-multipart
+   ```
+
+2. Launch the server:
+
+   ```bash
+   python -m app.web  # listens on http://127.0.0.1:8000
+   ```
+
+3. Open `http://127.0.0.1:8000` in a browser, upload reference and candidate
+   documents, adjust options (iterations, profile, HP PC-Fax queue, SMB ingest,
+   SNMP, FoIP), and start the run. The UI renders the per-iteration metrics and
+   provides direct download links to the HTML/CSV/JSON/log artifacts, FoIP
+   outputs, and telemetry.
+
+The web form simply orchestrates the same execution pipeline used by the CLI, so
+every feature—including SNMP snapshots, FoIP validation, HP PC-Fax submissions,
+and ingest polling—can be initiated from the browser.
 
 ## Configuration
 
