@@ -1,11 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller specification for the QAFAX desktop executable.
+"""PyInstaller specification for the single-file QAFAX desktop executable.
 
 This spec dynamically bundles optional dependencies (PySide6, Pillow, numpy,
 pdf2image, pytesseract, pyzbar, pyserial, smbprotocol, and PyWin32 modules)
 whenever they are available in the build environment so that the resulting
 `QAFAXDesktop.exe` ships with the full feature set without requiring manual
-installs on operator workstations.
+installs on operator workstations. The build emits a *single* executable so
+operators can download a lone ``.exe`` from GitHub without having to extract an
+archive first.
 """
 
 import importlib.util
@@ -124,17 +126,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-)
-
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name="QAFAXDesktop",
 )
 

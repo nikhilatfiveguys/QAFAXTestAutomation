@@ -98,15 +98,16 @@ artifacts appear in the window without blocking the interface.
 Every push to the `main` branch and any published GitHub release triggers the
 **Build QAFAX Desktop Executable** workflow. The automation installs the
 optional feature libraries, runs the unit test suite, builds the packaged GUI
-via `pyinstaller`, and publishes a `QAFAXDesktop.zip` artifact. You can obtain
-the self-contained executable in two ways:
+via `pyinstaller`, and publishes a standalone `QAFAXDesktop.exe` artifact. You
+can obtain the self-contained executable in two ways:
 
 1. Navigate to **Actions → Build QAFAX Desktop Executable → latest successful
-   run** and download the `QAFAXDesktop.zip` artifact. The archive contains the
-   bundled `QAFAXDesktop.exe`, configuration files, and documentation.
-2. When tagging a release, the workflow automatically uploads the same archive
-   to the release assets so operators can fetch it directly from the release
-   page.
+   run** and download the `QAFAXDesktop.exe` artifact. The binary already embeds
+   configuration files and documentation, so you can save it anywhere and run
+   it directly.
+2. When tagging a release, the workflow automatically uploads the same
+   executable to the release assets so operators can fetch it directly from the
+   release page.
 
 The packaged build embeds PySide6, optional verification dependencies, and the
 `config/` + `docs/` trees, so Windows users can launch the desktop app without
@@ -126,7 +127,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build_windows_exe.ps1
 
 The PowerShell helper invokes `PyInstaller` with `scripts/qafax_desktop.spec`, which
 automatically collects the optional packages when present and embeds `config/` and
-`docs/` so `dist/QAFAXDesktop/QAFAXDesktop.exe` runs on clean operator workstations
+`docs/` so the resulting `dist/QAFAXDesktop.exe` runs on clean operator workstations
 without additional downloads. Sign the resulting binary according to your deployment
 policies before distribution.
 

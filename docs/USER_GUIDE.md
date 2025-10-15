@@ -234,8 +234,8 @@ After each run, inspect the following files under `artifacts/<run-id>/`:
 **Download from GitHub:** Every push to `main` and each published release triggers the
 GitHub Actions workflow named **Build QAFAX Desktop Executable**. Open the latest
 successful run under the Actions tab (or the release page) to download the
-`QAFAXDesktop.zip` archive, which contains the ready-to-run executable plus bundled
-configs and documentation.
+`QAFAXDesktop.exe` artifact, which already contains the ready-to-run executable plus
+bundled configs and documentation.
 
 **Build locally (optional):**
 
@@ -244,7 +244,7 @@ configs and documentation.
    pyzbar pyserial smbprotocol pywin32`).
 2. Run `powershell -ExecutionPolicy Bypass -File scripts/build_windows_exe.ps1` from a
    Developer PowerShell prompt.
-3. After the build finishes, navigate to `dist/QAFAXDesktop/` and launch
+3. After the build finishes, navigate to the `dist/` directory and launch
    `QAFAXDesktop.exe`. The packaged application embeds the GUI, configuration files, and
    any installed optional dependencies so QA operators can run it without extra
    downloads.

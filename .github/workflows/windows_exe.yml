@@ -48,21 +48,22 @@ jobs:
       - name: Build executable
         run: pyinstaller scripts/qafax_desktop.spec
 
-      - name: Package artifact
+      - name: Verify executable output
         shell: pwsh
         run: |
-          if (Test-Path dist/QAFAXDesktop.zip) { Remove-Item dist/QAFAXDesktop.zip }
-          Compress-Archive -Path dist/QAFAXDesktop -DestinationPath dist/QAFAXDesktop.zip
+          if (-not (Test-Path dist/QAFAXDesktop.exe)) {
+            Write-Error "Expected dist/QAFAXDesktop.exe but it was not produced"
+          }
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: QAFAXDesktop-${{ github.run_id }}
-          path: dist/QAFAXDesktop.zip
+          path: dist/QAFAXDesktop.exe
           retention-days: 14
 
       - name: Publish release asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/QAFAXDesktop.zip
+          files: dist/QAFAXDesktop.exe
