@@ -13,7 +13,8 @@ artifacts suitable for QA review packages.
 - JSON/CSV/HTML reports, a plain-text run log, telemetry export, and a provenance manifest
   under `artifacts/<run-id>/`
 - Configurable device profiles and verification policies loaded from `config/`
-- Metadata capture for DID, HP PC-Fax queue submissions, and ingest directory monitoring
+- Metadata capture for DID, HP PC-Fax queue submissions, ingest directory monitoring,
+  optional SNMP snapshots, and FoIP/T.38 validation attempts
 - Optional self-test tool that checks for optional dependencies and environment readiness
 
 ## Getting Started
@@ -36,11 +37,14 @@ artifacts suitable for QA review packages.
    - `--pcfax-queue` to attempt an HP PC-Fax submission (Windows + PyWin32 required)
    - `--ingest-dir` / `--ingest-pattern` / `--ingest-timeout` / `--ingest-interval` to poll a
      scan folder for new artifacts after each run
+   - `--snmp-target` / `--snmp-community` / `--snmp-oids` to collect printer counters via SNMP
+   - `--foip-config` to execute a FoIP/T.38 validation workflow defined by a JSON config
    - `--require-ocr` and `--require-barcode` to promote optional metrics to hard gates
 
 3. Inspect the generated artifacts under `artifacts/<run-id>/`:
 
-   - `summary.json` — full run metadata, per-iteration metrics, optional ingest manifest, and telemetry
+   - `summary.json` — full run metadata, per-iteration metrics, optional ingest manifest,
+     SNMP snapshots, FoIP results, and telemetry
    - `summary.csv` — iteration summaries suitable for spreadsheets
    - `report.html` — human-friendly view with chips and negotiation logs
    - `run.log` — text log of Phase B→D events for every iteration
@@ -49,10 +53,11 @@ artifacts suitable for QA review packages.
 
 ## Configuration
 
-Device profiles live under `config/profiles/` and verification policies under
-`config/verify_policy.*.json`. Each run records the SHA-256 hash of the loaded profile and
-policy so operators can reproduce results. Policies now include preprocessing preferences
-and optional metric gates that can be tightened per site.
+Device profiles live under `config/profiles/`, verification policies under
+`config/verify_policy.*.json`, and FoIP samples in `config/foip.sample.json`. Each run
+records the SHA-256 hash of the loaded profile and policy so operators can reproduce
+results. Policies now include preprocessing preferences and optional metric gates that can
+be tightened per site.
 
 ## Self-Test
 

@@ -7,6 +7,8 @@ from typing import Dict, Iterable, List, Sequence
 import csv
 import json
 
+from ..connectors.snmp import SNMPSnapshot
+from ..core.foip import FoipResult
 from ..core.iteration_controller import IterationResult
 from ..core.run_context import RunContext
 from ..verify.loaders import DocumentData
@@ -31,6 +33,9 @@ class ReportBuilder:
         iterations: Iterable[IterationResult],
         telemetry: Iterable[Dict[str, object]],
         ingest_artifacts: Sequence[Dict[str, object]] | None = None,
+        *,
+        snmp_snapshot: SNMPSnapshot | None = None,
+        foip_result: FoipResult | None = None,
     ) -> Path:
         path = run_dir / "summary.json"
         payload = {
@@ -40,6 +45,10 @@ class ReportBuilder:
         }
         if ingest_artifacts is not None:
             payload["ingestArtifacts"] = list(ingest_artifacts)
+        if snmp_snapshot is not None:
+            payload["snmp"] = snmp_snapshot.to_dict()
+        if foip_result is not None:
+            payload["foip"] = foip_result.to_dict()
         path.write_text(json.dumps(payload, indent=2))
         return path
 
@@ -90,6 +99,7 @@ class ReportBuilder:
         path = run_dir / "report.html"
         chips = self._chips(context)
         iteration_sections = "\n".join(self._html_iteration_section(result) for result in iterations)
+        extra_sections = self._html_snmp_section(context) + self._html_foip_section(context)
         html = """
 <!DOCTYPE html>
 <html>
@@ -124,6 +134,7 @@ class ReportBuilder:
     <span>Reference: {reference}</span>
     <span>Candidate: {candidate}</span>
   </div>
+  {extra_sections}
   {iteration_sections}
 </body>
 </html>
@@ -136,6 +147,7 @@ class ReportBuilder:
             seed=context.seed,
             reference=context.reference,
             candidate=context.candidate,
+            extra_sections=extra_sections,
             iteration_sections=iteration_sections,
         )
         path.write_text(html)
@@ -163,6 +175,22 @@ class ReportBuilder:
             lines.append(f"HP PC-Fax Detail: {context.pcfax_detail}")
         if context.ingest_dir:
             lines.append(f"Ingest Directory: {context.ingest_dir} pattern={context.ingest_pattern or '*'}")
+        if context.foip_result:
+            lines.append(
+                f"FoIP validation executed={context.foip_result.executed} detail={context.foip_result.detail}"
+            )
+            for error in context.foip_result.errors:
+                lines.append(f"FoIP error: {error}")
+            for artifact in context.foip_result.artifacts:
+                lines.append(
+                    f"FoIP artifact: {artifact.path} size={artifact.size} sha256={artifact.sha256}"
+                )
+        if context.snmp_snapshot:
+            lines.append(f"SNMP target: {context.snmp_snapshot.target}")
+            for error in context.snmp_snapshot.errors:
+                lines.append(f"SNMP error: {error}")
+            for oid, value in context.snmp_snapshot.values.items():
+                lines.append(f"SNMP {oid}: {value}")
         lines.append("")
         for result in iterations:
             verification = result.verification
@@ -182,6 +210,9 @@ class ReportBuilder:
         reference: DocumentData,
         candidate: DocumentData,
         ingest_artifacts: Sequence[Dict[str, object]],
+        *,
+        snmp_snapshot: SNMPSnapshot | None = None,
+        foip_result: FoipResult | None = None,
     ) -> Path:
         payload = {
             "reference": {
@@ -198,6 +229,10 @@ class ReportBuilder:
             },
             "ingest": list(ingest_artifacts),
         }
+        if snmp_snapshot is not None:
+            payload["snmp"] = snmp_snapshot.to_dict()
+        if foip_result is not None:
+            payload["foip"] = foip_result.to_dict()
         path = run_dir / "provenance.json"
         path.write_text(json.dumps(payload, indent=2))
         return path
@@ -220,6 +255,12 @@ class ReportBuilder:
         ingest_label = context.ingest_label
         if ingest_label:
             chips.append(ingest_label)
+        foip_label = context.foip_label
+        if foip_label:
+            chips.append(foip_label)
+        snmp_label = context.snmp_label
+        if snmp_label:
+            chips.append(snmp_label)
         return chips
 
     def _run_metadata(self, context: RunContext) -> Dict[str, object]:
@@ -249,6 +290,8 @@ class ReportBuilder:
             "ingestPattern": context.ingest_pattern,
             "reference": str(context.reference),
             "candidate": str(context.candidate),
+            "snmp": context.snmp_snapshot.to_dict() if context.snmp_snapshot else None,
+            "foip": context.foip_result.to_dict() if context.foip_result else None,
         }
 
     def _iteration_dict(self, result: IterationResult) -> Dict[str, object]:
@@ -323,6 +366,60 @@ class ReportBuilder:
             seed=result.simulation.rng_seed,
             metrics_rows=metrics_rows,
             events_rows=events_rows or "<tr><td colspan='4'>No events recorded.</td></tr>",
+        )
+
+    def _html_snmp_section(self, context: RunContext) -> str:
+        snapshot = context.snmp_snapshot
+        if not snapshot:
+            return ""
+        values_rows = "".join(
+            f"<tr><td>{oid}</td><td>{value}</td></tr>" for oid, value in snapshot.values.items()
+        )
+        if not values_rows:
+            values_rows = "<tr><td colspan='2'>No values returned.</td></tr>"
+        errors = "".join(f"<li>{error}</li>" for error in snapshot.errors)
+        error_block = f"<ul>{errors}</ul>" if errors else "<p>No SNMP errors reported.</p>"
+        return """
+  <section class="iteration">
+    <h2>SNMP Snapshot — {target}</h2>
+    <p>Community: {community} • Captured: {captured}</p>
+    <table class="metrics"><thead><tr><th>OID</th><th>Value</th></tr></thead><tbody>{rows}</tbody></table>
+    <div class="meta">{error_block}</div>
+  </section>
+""".format(
+            target=snapshot.target,
+            community=snapshot.community,
+            captured=snapshot.captured_at.isoformat(timespec="seconds"),
+            rows=values_rows,
+            error_block=error_block,
+        )
+
+    def _html_foip_section(self, context: RunContext) -> str:
+        result = context.foip_result
+        if not result:
+            return ""
+        artifact_rows = "".join(
+            f"<tr><td>{artifact.path}</td><td>{artifact.size}</td><td>{artifact.sha256}</td></tr>"
+            for artifact in result.artifacts
+        )
+        if not artifact_rows:
+            artifact_rows = "<tr><td colspan='3'>No FoIP artifacts captured.</td></tr>"
+        errors = "".join(f"<li>{error}</li>" for error in result.errors)
+        error_block = f"<ul>{errors}</ul>" if errors else "<p>No FoIP errors reported.</p>"
+        command = " ".join(result.command) if result.command else "(none)"
+        return """
+  <section class="iteration">
+    <h2>FoIP Validation</h2>
+    <p>Executed: {executed} • Detail: {detail} • Command: {command}</p>
+    <table class="metrics"><thead><tr><th>Artifact</th><th>Size</th><th>SHA-256</th></tr></thead><tbody>{rows}</tbody></table>
+    <div class="meta">{error_block}</div>
+  </section>
+""".format(
+            executed="Yes" if result.executed else "No",
+            detail=result.detail,
+            command=command,
+            rows=artifact_rows,
+            error_block=error_block,
         )
 
 

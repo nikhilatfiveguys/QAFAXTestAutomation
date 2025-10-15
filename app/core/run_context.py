@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Optional
 
 from .fax_simulation import FaxProfile
+from ..connectors.snmp import SNMPSnapshot
+from .foip import FoipResult
 
 
 @dataclass
@@ -27,6 +29,8 @@ class RunContext:
     ingest_dir: Optional[str] = None
     ingest_pattern: Optional[str] = None
     pcfax_detail: Optional[str] = None
+    snmp_snapshot: Optional[SNMPSnapshot] = None
+    foip_result: Optional[FoipResult] = None
 
     @property
     def path_label(self) -> str:
@@ -45,4 +49,19 @@ class RunContext:
     def ingest_label(self) -> Optional[str]:
         if self.ingest_dir:
             return f"Ingest: {self.ingest_dir} ({self.ingest_pattern or '*'})"
+        return None
+
+    @property
+    def foip_label(self) -> Optional[str]:
+        if self.foip_result:
+            status = "Executed" if self.foip_result.executed else "Dry-Run"
+            return f"FoIP {status}"
+        return None
+
+    @property
+    def snmp_label(self) -> Optional[str]:
+        if self.snmp_snapshot:
+            if self.snmp_snapshot.errors:
+                return f"SNMP WARN {self.snmp_snapshot.target}"
+            return f"SNMP {self.snmp_snapshot.target}"
         return None

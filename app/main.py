@@ -8,8 +8,10 @@ from typing import Dict, Iterable, List, Optional, Sequence
 import json
 
 from .connectors.smb_ingest import SMBIngestor
+from .connectors.snmp import SNMPSnapshot, query_status
 from .core.config_service import ConfigService, default_config_service
 from .core.fax_simulation import FaxProfile
+from .core.foip import FoipResult, FoipValidator
 from .core.iteration_controller import IterationConfig, IterationController, IterationResult
 from .core.run_context import RunContext
 from .core.send_pcfax import submit_to_queue
@@ -58,6 +60,8 @@ def _build_context(
     pcfax_detail: str | None,
     ingest_dir: Optional[str],
     ingest_pattern: Optional[str],
+    snmp_snapshot: SNMPSnapshot | None,
+    foip_result: FoipResult | None,
 ) -> RunContext:
     return RunContext(
         run_id=run_id,
@@ -76,6 +80,8 @@ def _build_context(
         ingest_dir=ingest_dir,
         ingest_pattern=ingest_pattern,
         pcfax_detail=pcfax_detail,
+        snmp_snapshot=snmp_snapshot,
+        foip_result=foip_result,
     )
 
 
@@ -86,16 +92,33 @@ def _persist_reports(
     iterations: List[IterationResult],
     telemetry: List[dict],
     ingest_artifacts: Sequence[Dict[str, object]],
+    snmp_snapshot: SNMPSnapshot | None,
+    foip_result: FoipResult | None,
 ) -> Path:
     run_dir = report_builder.ensure_run_directory(run_id)
-    report_builder.write_json(run_dir, context, iterations, telemetry, ingest_artifacts)
+    report_builder.write_json(
+        run_dir,
+        context,
+        iterations,
+        telemetry,
+        ingest_artifacts,
+        snmp_snapshot=snmp_snapshot,
+        foip_result=foip_result,
+    )
     report_builder.write_csv(run_dir, context, iterations)
     report_builder.write_html(run_dir, context, iterations)
     report_builder.write_run_log(run_dir, context, iterations)
     if iterations:
         reference_doc, candidate_doc = _first_verified_documents(iterations)
         if reference_doc and candidate_doc:
-            report_builder.write_provenance(run_dir, reference_doc, candidate_doc, ingest_artifacts)
+            report_builder.write_provenance(
+                run_dir,
+                reference_doc,
+                candidate_doc,
+                ingest_artifacts,
+                snmp_snapshot=snmp_snapshot,
+                foip_result=foip_result,
+            )
     telemetry_path = run_dir / "telemetry.json"
     telemetry_path.write_text(json.dumps(telemetry, indent=2))
     return run_dir
@@ -149,6 +172,19 @@ def run(argv: List[str] | None = None) -> None:
     )
     parser.add_argument("--require-ocr", action="store_true", help="Force OCR metric to be required")
     parser.add_argument("--require-barcode", action="store_true", help="Force barcode metric to be required")
+    parser.add_argument("--snmp-target", default=None, help="SNMP target hostname or IP")
+    parser.add_argument("--snmp-community", default="public", help="SNMP community string")
+    parser.add_argument(
+        "--snmp-oids",
+        default="1.3.6.1.2.1.43.10.2.1.4.1.1,1.3.6.1.2.1.43.16.5.1.2.1.1",
+        help="Comma-separated list of SNMP OIDs to query",
+    )
+    parser.add_argument(
+        "--foip-config",
+        type=Path,
+        default=None,
+        help="Path to FoIP/T.38 validation configuration JSON",
+    )
     args = parser.parse_args(argv)
 
     config = default_config_service()
@@ -172,6 +208,40 @@ def run(argv: List[str] | None = None) -> None:
             detail=result.detail,
         )
         pcfax_detail = result.detail
+
+    snmp_snapshot: Optional[SNMPSnapshot] = None
+    if args.snmp_target:
+        oids = [oid.strip() for oid in args.snmp_oids.split(",") if oid.strip()]
+        snmp_snapshot = query_status(args.snmp_target, args.snmp_community, oids)
+        controller.telemetry_sink.emit(
+            "snmp.snapshot",
+            target=args.snmp_target,
+            community=args.snmp_community,
+            values=snmp_snapshot.values,
+            errors=snmp_snapshot.errors,
+        )
+
+    foip_result: Optional[FoipResult] = None
+    if args.foip_config:
+        try:
+            validator = FoipValidator(args.foip_config)
+        except (OSError, json.JSONDecodeError) as exc:
+            foip_result = FoipResult(
+                executed=False,
+                detail="FoIP configuration error",
+                artifacts=[],
+                errors=[str(exc)],
+                command=None,
+            )
+        else:
+            foip_result = validator.run()
+        controller.telemetry_sink.emit(
+            "foip.validation",
+            executed=foip_result.executed,
+            detail=foip_result.detail,
+            artifacts=len(foip_result.artifacts),
+            errors=foip_result.errors,
+        )
 
     ingest_artifacts: List[Dict[str, object]] = []
     ingestor: Optional[SMBIngestor] = None
@@ -213,6 +283,8 @@ def run(argv: List[str] | None = None) -> None:
         pcfax_detail=pcfax_detail,
         ingest_dir=args.ingest_dir,
         ingest_pattern=args.ingest_pattern if args.ingest_dir else None,
+        snmp_snapshot=snmp_snapshot,
+        foip_result=foip_result,
     )
 
     report_builder = ReportBuilder(args.output)
@@ -224,6 +296,8 @@ def run(argv: List[str] | None = None) -> None:
         iteration_results,
         telemetry_events,
         ingest_artifacts,
+        snmp_snapshot,
+        foip_result,
     )
 
     print(
